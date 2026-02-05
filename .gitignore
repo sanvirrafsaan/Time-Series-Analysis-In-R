@@ -1,0 +1,19 @@
+# Rendered reports
+reports/
+*.html
+*.pdf
+
+# R workspace files
+.Rhistory
+.RData
+.Ruserdata
+
+# macOS
+.DS_Store
+
+# RStudio
+.Rproj.user/
+
+# Temporary files
+*.tmp
+*.log

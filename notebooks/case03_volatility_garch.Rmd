@@ -1,0 +1,238 @@
+---
+title: "Case Study: Stock Return Volatility (ARIMA + GARCH)"
+author: "Rafsaan Sanvir"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+)
+# Load dependencies and utility functions
+source("../requirements.R")
+source("../R/prep.R")
+source("../R/models.R")
+source("../R/diagnostics_eval.R")
+```
+
+## Problem / Business Question
+
+Financial institutions and individual investors care not only about the expected return of an asset, but also about how *volatile* those returns are over time. Volatility drives risk, margin requirements, and how much capital can be safely allocated to a position.
+
+In this case study, we analyze daily returns of Barrick stock and build a volatility forecasting model using ARIMA and GARCH. The goal is to understand how volatility clusters over time and to compare models that can be used to anticipate periods of higher or lower risk.
+
+## Data Description
+
+```{r data-load}
+# Load daily stock returns data
+stock <- scan("../data/barrick.txt")
+stock <- ts(stock)
+
+summary(stock)
+plot(stock, main = "Barrick Stock Returns", ylab = "Return")
+```
+
+The series contains daily stock returns for Barrick over a historical period. We treat the data as a univariate time series of returns, measured at a regular daily frequency.
+
+## Methods
+
+We use a two-step modeling strategy:
+
+- **Mean process (ARIMA)**: We first fit ARIMA models to capture any serial correlation in returns.
+- **Volatility process (GARCH)**: We then model the conditional variance of the ARIMA residuals using GARCH models, which are designed to capture volatility clustering.
+
+**Diagnostics approach:**
+- **Stationarity tests** (ADF) for the raw series
+- **Residual checks** (Ljung–Box, ACF) for autocorrelation
+- **Information criteria** (AIC/BIC) to compare GARCH variants
+- **Visual diagnostics** (residual plots, ACF/PACF) to assess model adequacy
+
+**Model comparison:**
+We compare three specifications:
+1. **Baseline**: ARIMA(0,1,1) on the returns
+2. **ARIMA(0,1,2)**: Richer ARIMA specification for the mean
+3. **ARIMA(0,1,2) + GARCH**: Combined model with GARCH volatility modeling
+
+## Stationarity and Preliminary Checks
+
+```{r stationarity}
+library(tseries)
+
+# Augmented Dickey-Fuller tests for unit roots
+adf_test_default <- adf.test(stock)
+adf_test_k2 <- adf.test(stock, k = 2)
+
+adf_test_default
+adf_test_k2
+```
+
+The ADF tests fail to reject the null hypothesis of non-stationarity at conventional levels, so we treat the series as non-stationary in mean and proceed with differencing via ARIMA.
+
+## Models & Diagnostics
+
+### Baseline ARIMA Models
+
+```{r arima-fit}
+# Fit candidate ARIMA models
+ar_011 <- fit_arima_model(stock, order = c(0, 1, 1))
+ar_012 <- fit_arima_model(stock, order = c(0, 1, 2))
+
+# Extract residuals for diagnostics
+resid_011 <- residuals(ar_011)
+resid_012 <- residuals(ar_012)
+
+# Compare AIC
+ar_011$aic
+ar_012$aic
+
+# Ljung-Box tests on residuals (white-noise checks)
+lb_011 <- run_ljung_box(resid_011, lag = 10, fitdf = 1)
+lb_012 <- run_ljung_box(resid_012, lag = 10, fitdf = 2)
+```
+
+On AIC, ARIMA(0,1,2) is preferred over ARIMA(0,1,1). However, Ljung–Box tests still show evidence of residual autocorrelation, indicating that neither model fully captures the dynamics.
+
+```{r residual-diagnostics-arima, fig.width=7, fig.height=5}
+plot_residual_diagnostics(resid_011, main_prefix = "ARIMA(0,1,1) residuals")
+plot_residual_diagnostics(resid_012, main_prefix = "ARIMA(0,1,2) residuals")
+```
+
+The residual diagnostics show remaining structure (particularly in squared residuals), suggesting time-varying volatility that ARIMA alone cannot capture.
+
+### GARCH Models on ARIMA(0,1,2) Residuals
+
+We now model the ARIMA(0,1,2) residuals with GARCH. We consider several ARCH and GARCH configurations and use AIC/BIC and residual tests to choose a parsimonious model.
+
+```{r garch-fit}
+library(fGarch)
+
+residuals_arma <- resid_012
+
+# Fit ARCH candidates (ARCH(m,0) models)
+arch_candidates <- fit_garch_candidates(
+  residuals = residuals_arma,
+  arch_orders = c(1, 2, 3, 4, 5),
+  garch_orders = rep(0, 5),
+  trace = FALSE
+)
+arch_candidates$stats
+```
+
+Higher-order ARCH models (e.g., ARCH(5)) tend to reduce AIC/BIC but can be less interpretable. In practice, we prefer low-order **GARCH** models that capture volatility clustering with fewer parameters.
+
+```{r garch-candidates}
+# Fit GARCH candidates (GARCH(1,r) models)
+garch_candidates <- fit_garch_candidates(
+  residuals = residuals_arma,
+  arch_orders = c(1, 1, 1),
+  garch_orders = c(1, 2, 3),
+  trace = FALSE
+)
+
+garch_candidates$stats
+```
+
+We select the GARCH variant with the lowest AIC/BIC as our preferred volatility model.
+
+```{r select-best-garch}
+# Select best GARCH model by AIC
+stats_df <- garch_candidates$stats
+best_idx <- which.min(stats_df$AIC)
+best_garch <- garch_candidates$models[[best_idx]]
+best_stats <- stats_df[best_idx, ]
+
+best_stats
+```
+
+```{r garch-diagnostics, fig.width=7, fig.height=5}
+summary(best_garch)
+
+# Standardized residuals from GARCH model
+garch_resid <- residuals(best_garch, standardize = TRUE)
+plot_residual_diagnostics(garch_resid, main_prefix = "Best GARCH standardized residuals")
+```
+
+The GARCH residual diagnostics look closer to white noise, and Ljung–Box tests on squared residuals (reported in the `summary()` output) no longer show strong evidence of autocorrelation. This indicates a well-specified volatility model.
+
+## Model Comparison Table
+
+We construct a comparison across three models using information criteria and residual diagnostics:
+
+```{r model-comparison}
+# Build comparison table with AIC/BIC for mean and volatility components
+comparison <- data.frame(
+  Model = c("ARIMA(0,1,1)", "ARIMA(0,1,2)", paste0("ARIMA(0,1,2) + ", best_stats$Model)),
+  AIC_mean = c(ar_011$aic, ar_012$aic, ar_012$aic),
+  BIC_mean = c(NA_real_, NA_real_, NA_real_),  # BIC not directly comparable across ARIMA specs
+  AIC_volatility = c(NA_real_, NA_real_, best_stats$AIC),
+  BIC_volatility = c(NA_real_, NA_real_, best_stats$BIC),
+  stringsAsFactors = FALSE
+)
+
+# Format for display
+comparison$AIC_mean <- round(comparison$AIC_mean, 2)
+comparison$AIC_volatility <- round(comparison$AIC_volatility, 2)
+comparison$BIC_volatility <- round(comparison$BIC_volatility, 2)
+
+comparison
+```
+
+**Interpretation:**
+- **ARIMA(0,1,2)** improves the mean fit over the baseline (lower AIC_mean)
+- **ARIMA(0,1,2) + GARCH** adds volatility modeling with lower AIC/BIC for the variance component
+- The biggest gain comes from explicitly modeling volatility, which ARIMA alone cannot capture
+
+## Diagnostics and Final Model Choice
+
+From the combination of:
+- **AIC/BIC** for the ARIMA mean and GARCH volatility components
+- **Ljung–Box tests** on both residuals and squared residuals
+- **Visual diagnostics** (ACF/PACF, residual plots)
+
+we select **ARIMA(0,1,2) for the mean combined with a low-order GARCH model (e.g., GARCH(1,2)) for volatility** as the preferred specification.
+
+**Rationale:**
+- The ARIMA(0,1,2) model captures more serial correlation in returns than the baseline ARIMA(0,1,1)
+- The GARCH layer captures volatility clustering: periods of high volatility followed by periods of low volatility
+- Residual diagnostics for the combined model look closer to white noise, indicating that we have explained most of the predictable structure in both the mean and variance
+
+## Key Takeaways
+
+- **Volatility is persistent**: The Barrick returns show clear volatility clustering, meaning that high-volatility days tend to follow each other. This matters for risk limits and position sizing.
+- **ARIMA alone is not enough**: While ARIMA(0,1,2) improves the mean fit relative to a simpler baseline, the residuals still show structure in their squared values, signaling time-varying risk.
+- **GARCH adds risk insight**: Adding a GARCH layer on top of ARIMA provides a more realistic picture of how uncertainty evolves over time and produces volatility forecasts that can feed into risk management decisions.
+
+## Recommendation
+
+For **risk management and position sizing**, we recommend using the **ARIMA(0,1,2) + GARCH(1,2) model**:
+
+1. **Volatility forecasting**: The model provides forward-looking volatility estimates that can inform dynamic risk limits and position sizing decisions.
+2. **Risk awareness**: It explicitly captures volatility clustering, helping identify periods of elevated risk that may require more conservative capital allocation.
+3. **Model adequacy**: Residual diagnostics indicate the model adequately captures both mean dynamics and volatility structure.
+
+**Implementation**: The model can be refit periodically (e.g., weekly or monthly) on rolling windows to adapt to changing market conditions. Volatility forecasts can be used to:
+- Set dynamic stop-loss levels
+- Adjust position sizes inversely with forecasted volatility
+- Flag periods requiring increased monitoring or reduced exposure
+
+## Limitations and Next Steps
+
+**Limitations:**
+- **In-sample analysis**: This analysis focuses on in-sample fit. For production use, out-of-sample forecast evaluation (e.g., rolling-window validation) would be essential.
+- **Single asset**: The model is fit to a single stock. For portfolio risk management, multivariate GARCH models (e.g., DCC-GARCH) would be more appropriate.
+- **Distribution assumptions**: The GARCH model assumes Gaussian innovations. For assets with heavy tails, alternative distributions (e.g., Student-t) may be more appropriate.
+- **Regime changes**: The model assumes stationarity in parameters. In practice, structural breaks or regime changes may require time-varying parameter models.
+
+**Next Steps:**
+- **Out-of-sample validation**: Implement rolling-window forecasting and evaluate forecast accuracy using metrics like RMSE, MAE, or Value-at-Risk (VaR) backtesting
+- **Multivariate extension**: Extend to portfolio-level volatility modeling using multivariate GARCH specifications
+- **Alternative distributions**: Test Student-t or skewed distributions for the innovation process
+- **Regime-switching models**: Consider Markov-switching GARCH models to capture different volatility regimes
+- **Real-time implementation**: Build a pipeline to refit models on new data and generate volatility forecasts automatically

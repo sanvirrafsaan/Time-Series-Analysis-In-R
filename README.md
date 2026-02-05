@@ -1,62 +1,73 @@
-# Time Series Analysis in R
+# Time Series Forecasting & Volatility Modeling (ARIMA/GARCH/STL)
 
-This repository showcases my understanding of time series analysis using R, demonstrated through a series of challenging assignments. It contains eight key files—four for assignment questions and four for their corresponding solutions—each focusing on real-world datasets and applying advanced statistical and spectral analysis techniques.
+This repository demonstrates applied time-series forecasting and volatility modeling using R, focusing on real-world case studies in financial risk management and seasonal decomposition. The project showcases end-to-end modeling workflows from data preprocessing through model selection, diagnostics, and stakeholder communication.
 
+## Highlights
 
-## Assignment Breakdown
+**Methods & Techniques:**
+- **ARIMA/SARIMA** modeling for non-stationary time series
+- **GARCH/ARCH** volatility modeling for risk forecasting
+- **STL decomposition** for seasonal adjustment
+- **Stationarity testing** (Augmented Dickey-Fuller, KPSS)
+- **Residual diagnostics** (Ljung-Box, ACF/PACF, QQ-plots)
+- **Model comparison** using AIC/BIC and forecast error metrics
 
-### **Assignment 1: Exchange Rates & CO₂ Trends**
-- **Files:** `a1 question` and `a1 solutions`
-- **Overview:**  
-  - **Exchange Rates:** Analysis of daily Canadian/U.S. dollar exchange rates using log transformations, differencing, correlograms, and periodograms to evaluate autocorrelation, spectral properties, and the random walk hypothesis.
-  - **CO₂ Trends:** Investigation of average monthly atmospheric CO₂ concentrations at Mauna Loa. This includes spectral analysis to identify seasonal peaks and detrending to emphasize seasonality.
-- **Key Techniques:**  
-  - Data transformation (log scale, differencing)  
-  - Autocorrelation analysis via correlograms and periodograms  
-  - Trend estimation and detrending  
-  - Spectral density estimation
+**Diagnostics & Evaluation:**
+- Comprehensive residual analysis and white-noise testing
+- Information criteria for model selection
+- Visual diagnostics (ACF/PACF, residual plots, volatility forecasts)
+- Explicit model comparison tables with quantitative metrics
 
-### **Assignment 2: Stationarity Testing & Tidal Analysis**
-- **Files:** `a2 questions` and `a2 solutions`
-- **Overview:**  
-  - **Exchange Rate Stationarity:** Application of the Augmented Dickey-Fuller (ADF) test to assess unit roots, along with Ljung-Box and Bartlett tests on first differences and absolute returns to check for white noise properties.
-  - **Tidal Data Analysis:** Analysis of hourly tide heights from Sooke Basin by fitting AR models with order selection via AIC, and verifying residuals to ensure robust spectral density estimation.
-- **Key Techniques:**  
-  - Unit root testing (ADF test)  
-  - White noise testing (Ljung-Box, Bartlett tests)  
-  - AR and ARMA model fitting  
-  - Model diagnostics and spectral analysis
+## Repository Structure
 
-### **Assignment 3: Seasonal Adjustment & Speech Signal Processing**
-- **Files:** `a3 questions` and `a3 solutions`
-- **Overview:**  
-  - **Traffic Fatalities:** Seasonal adjustment of monthly traffic fatality data in Ontario using STL decomposition. This includes isolating trend, seasonal, and irregular components, and evaluating the irregular component against white noise.
-  - **Speech Signal Analysis:** High-frequency analysis of a speech signal (sampled at 10,000 Hz) using various spectral density estimation techniques—AR-based, multitaper, and Parzen lag window methods—to identify dominant frequencies.
-- **Key Techniques:**  
-  - STL decomposition for seasonal adjustment  
-  - Evaluation of seasonal, trend, and irregular components  
-  - Advanced spectral density estimation  
-  - Frequency domain analysis
+| Directory | Description |
+|-----------|-------------|
+| `data/` | Datasets used in case studies (see `data/README.md` for details) |
+| `R/` | Reusable R functions for preprocessing, modeling, and diagnostics |
+| `notebooks/` | Case study notebooks (`.Rmd` files) |
+| `reports/` | Rendered HTML/PDF outputs (excluded from git) |
 
-### **Assignment 4: Stock Price Modeling & Volatility Analysis**
-- **Files:** `a4 questions` and `a4 solutions`
-- **Overview:**  
-  - **Stock Price Modeling:** Analysis of daily stock prices (log-transformed) for Barrick Gold using ARIMA models (ARIMA(0,1,1) and ARIMA(0,1,2)) to capture non-stationary behavior and trends.
-  - **Volatility Analysis:** Application of ARCH and GARCH models to the residuals from the preferred ARIMA model, comparing model performance to capture volatility dynamics accurately.
-- **Key Techniques:**  
-  - ARIMA modeling for non-stationary data  
-  - Volatility modeling using ARCH and GARCH  
-  - Residual analysis and model diagnostics
+**Key Files:**
+- `requirements.R` - Package installation and loading
+- `R/prep.R` - Preprocessing and stationarity checks
+- `R/models.R` - ARIMA and GARCH model fitting
+- `R/diagnostics_eval.R` - Diagnostics plots and forecast evaluation
+- `notebooks/case03_volatility_garch.Rmd` - Flagship case study: Stock return volatility modeling
 
-## Technical Competencies Demonstrated
+## How to Run
 
-- **Data Transformation & Preprocessing:** Expertise in log transformations, differencing, and detrending to stabilize time series data.
-- **Exploratory Analysis & Visualization:** Proficient in using correlograms and periodograms to understand autocorrelation and spectral properties.
-- **Statistical Testing & Model Validation:** Advanced skills in applying ADF, Ljung-Box, and Bartlett tests to ensure model reliability.
-- **Model Fitting & Forecasting:** Strong experience in fitting AR, ARMA, ARIMA, ARCH, and GARCH models for trend analysis and volatility forecasting.
-- **Spectral Analysis:** Proficient in multiple spectral density estimation techniques to uncover periodic patterns and dominant frequencies.
-- **R Programming:** Reproducible, efficient, and well-documented analysis using R and its extensive suite of statistical packages.
+**Prerequisites:** R and RStudio installed
 
+1. **Install and load dependencies:**
+   ```r
+   source("requirements.R")
+   ```
 
-Thank you! 
+2. **Run a case study notebook:**
+   ```r
+   rmarkdown::render(
+     "notebooks/case03_volatility_garch.Rmd",
+     output_dir = "reports"
+   )
+   ```
+   Or use RStudio's "Knit" button with the project root as working directory.
 
+3. **View the rendered report:**
+   Open `reports/case03_volatility_garch.html` in your browser.
+
+## What This Demonstrates for Data Science Roles
+
+This project showcases skills relevant to **data scientist**, **quantitative analyst**, and **risk analyst** positions:
+
+- **Statistical Modeling**: Building and comparing time-series models (ARIMA, GARCH) with proper diagnostics
+- **Risk Management**: Volatility forecasting for financial risk assessment and position sizing
+- **Reproducible Analysis**: Modular R code structure, clear documentation, and end-to-end workflows
+- **Stakeholder Communication**: Translating technical modeling results into actionable insights for non-technical audiences
+- **Model Selection**: Using information criteria (AIC/BIC) and residual diagnostics to choose between competing specifications
+- **R Programming**: Efficient use of R's time-series ecosystem (`forecast`, `fGarch`, `tseries`) with custom utility functions
+
+The case studies demonstrate the ability to:
+- Handle non-stationary data through differencing and transformation
+- Model conditional heteroskedasticity (volatility clustering) using GARCH
+- Perform rigorous model validation through residual analysis
+- Communicate findings in a business context
